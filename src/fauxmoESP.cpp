@@ -1,6 +1,6 @@
 /*
 
-FAUXMO ESP 2.2.0
+FAUXMO ESP 2.4.0
 
 Copyright (C) 2016 by Xose Pérez <xose dot perez at gmail dot com>
 
@@ -48,12 +48,13 @@ void fauxmoESP::_sendUDPResponse(unsigned int device_id) {
         buffer,
         _base_port + _current,
         device.uuid,
-        _udpPattern == 1 ? UDP_DEVICE_PATTERN_1 : _udpPattern == 2 ? UDP_DEVICE_PATTERN_2 : UDP_DEVICE_PATTERN_3,
+        _udpPattern == 1 ? UDP_DEVICE_PATTERN_1 : _udpPattern == 2 ? UDP_DEVICE_PATTERN_2 : _udpPattern == 3 ? UDP_DEVICE_PATTERN_3 : _udpPattern == 4 ? UDP_DEVICE_PATTERN_4 : _udpPattern == 5 ? UDP_DEVICE_PATTERN_5 : UDP_ROOT_DEVICE,
         device.uuid,
-        _udpPattern == 1 ? UDP_DEVICE_PATTERN_1 : _udpPattern == 2 ? UDP_DEVICE_PATTERN_2 : UDP_DEVICE_PATTERN_3
+        _udpPattern == 1 ? UDP_DEVICE_PATTERN_1 : _udpPattern == 2 ? UDP_ROOT_DEVICE : _udpPattern == 3 ? UDP_ROOT_DEVICE : _udpPattern == 4 ? UDP_ROOT_DEVICE : _udpPattern == 5 ? UDP_ROOT_DEVICE : UDP_ROOT_DEVICE
     );
 
-    Serial.println(response);
+	sprintf(buffer, "%d.%d.%d.%d", _remoteIP[0], _remoteIP[1], _remoteIP[2], _remoteIP[3]);
+	DEBUG_MSG_FAUXMO("[FAUXMO] Search request from %s:%d\n%s\n", buffer, _remotePort, response);
 
     _udp.beginPacket(_remoteIP, _remotePort);
     _udp.write(response);
@@ -89,17 +90,13 @@ void fauxmoESP::_onUDPData(IPAddress remoteIP, unsigned int remotePort, void *da
 
     if (strstr(p, UDP_SEARCH_PATTERN) == (char *) data) {
         _udpPattern = 0;
-        if (strstr(p, UDP_DEVICE_PATTERN_1) != NULL) _udpPattern = 1;
-        if (strstr(p, UDP_DEVICE_PATTERN_2) != NULL) _udpPattern = 2;
-        if (strstr(p, UDP_DEVICE_PATTERN_3) != NULL) _udpPattern = 3;
-        if (strstr(p, UDP_ROOT_DEVICE) != NULL) _udpPattern = 3;
+        if (strstr(p, UDP_DEVICE_PATTERN_1) != NULL) _udpPattern = 1; // urn:Belkin:device:**
+        if (strstr(p, UDP_DEVICE_PATTERN_2) != NULL) _udpPattern = 2; // urn:Belkin:device:controllee:1
+        if (strstr(p, UDP_DEVICE_PATTERN_3) != NULL) _udpPattern = 3; // urn:Belkin:service:basicevent:1
+		if (strstr(p, UDP_DEVICE_PATTERN_4) != NULL) _udpPattern = 4; // ssdp:all
+		if (strstr(p, UDP_DEVICE_PATTERN_5) != NULL) _udpPattern = 5; // ssdpsearch:all
+        if (strstr(p, UDP_ROOT_DEVICE) != NULL) _udpPattern = 6;      // upnp:rootdevice
         if (_udpPattern) {
-
-            #ifdef DEBUG_FAUXMO
-                char buffer[16];
-                sprintf(buffer, "%d.%d.%d.%d", remoteIP[0], remoteIP[1], remoteIP[2], remoteIP[3]);
-                DEBUG_MSG_FAUXMO("[FAUXMO] Search request from %s\n", buffer);
-            #endif
 
             // Set hits to false
             for (unsigned int i = 0; i < _devices.size(); i++) {
@@ -131,7 +128,7 @@ void fauxmoESP::_handleSetup(AsyncClient *client, unsigned int device_id, void *
     fauxmoesp_device_t device = _devices[device_id];
 
     char response[strlen_P(SETUP_TEMPLATE) + 20];
-    sprintf_P(response, SETUP_TEMPLATE, device.name, device.uuid);
+    sprintf_P(response, SETUP_TEMPLATE, device.name, device.uuid, device.serial);
 
     char headers[strlen_P(HEADERS) + 10];
     sprintf_P(headers, HEADERS, strlen(response));
@@ -166,8 +163,8 @@ void fauxmoESP::_handleMetaInfoService(AsyncClient *client, unsigned int device_
 
     DEBUG_MSG_FAUXMO("[FAUXMO] Device #%d /metainfoservice.xml\n", device_id);
 
-    char response[strlen_P(EMPTYSERVICE_TEMPLATE)];
-    sprintf_P(response, EMPTYSERVICE_TEMPLATE);
+    char response[strlen_P(METAINFO_TEMPLATE)];
+    sprintf_P(response, METAINFO_TEMPLATE);
 
     char headers[strlen_P(HEADERS) + 10];
     sprintf_P(headers, HEADERS, strlen(response));
@@ -325,7 +322,12 @@ unsigned char fauxmoESP::addDevice(const char * device_name) {
     char uuid[15];
     sprintf(uuid, "444556%06X%02X\0", ESP.getChipId(), device_id); // "DEV" + CHIPID + DEV_ID
     new_device.uuid = strdup(uuid);
-
+	
+    // Create Serialnumber
+    char serial[15];
+    sprintf(serial, "221703K0%06X\0", ESP.getChipId()); // "DEV" + CHIPID
+    new_device.serial = strdup(serial);
+	
     // TCP Server
     new_device.server = new AsyncServer(_base_port + device_id);
     new_device.server->onClient([this, device_id](void *s, AsyncClient* c) {

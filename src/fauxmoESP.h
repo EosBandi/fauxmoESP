@@ -1,6 +1,6 @@
 /*
 
-FAUXMO ESP 2.2.0
+FAUXMO ESP 2.4.0
 
 Copyright (C) 2016 by Xose Pérez <xose dot perez at gmail dot com>
 
@@ -37,10 +37,14 @@ THE SOFTWARE.
 #define UDP_DEVICE_PATTERN_1    "urn:Belkin:device:**"
 #define UDP_DEVICE_PATTERN_2    "urn:Belkin:device:controllee:1"
 #define UDP_DEVICE_PATTERN_3    "urn:Belkin:service:basicevent:1"
+#define UDP_DEVICE_PATTERN_4    "ssdp:all"
+#define UDP_DEVICE_PATTERN_5    "ssdpsearch:all"
 #define UDP_ROOT_DEVICE         "upnp:rootdevice"
 
 #define UDP_RESPONSES_INTERVAL  250
 #define UDP_RESPONSES_TRIES     5
+
+//#define DEBUG_FAUXMO			Serial
 
 #ifdef DEBUG_FAUXMO
     #define DEBUG_MSG_FAUXMO(...) DEBUG_FAUXMO.printf( __VA_ARGS__ )
@@ -62,6 +66,7 @@ typedef std::function<bool(unsigned char, const char *)> TGetStateCallback;
 typedef struct {
     char * name;
     char * uuid;
+	char * serial;
     bool hit;
     bool state;
     AsyncServer * server;
